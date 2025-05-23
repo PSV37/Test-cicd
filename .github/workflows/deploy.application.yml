@@ -4,7 +4,7 @@ name: Deploy Application
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
@@ -37,7 +37,7 @@ jobs:
             set -e
 
             echo "Changing to project directory..."
-            cd /home/ubuntu/laravelnew-cicd
+            cd /home/ubuntu/test-app/Test-cicd
 
             echo "Setting file ownership and permissions..."
             sudo chown -R ubuntu:www-data storage bootstrap/cache
@@ -46,7 +46,7 @@ jobs:
             echo "Fetching latest code from Git..."
             sudo chown -R ubuntu:ubuntu .git
             git fetch --all
-            git reset --hard origin/main
+            git reset --hard origin/master
 
             echo "Installing dependencies..."
             COMPOSER_MEMORY_LIMIT=-1 composer install --no-interaction --prefer-dist --optimize-autoloader
