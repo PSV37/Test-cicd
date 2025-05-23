@@ -1,0 +1,64 @@
+
+name: Deploy Application
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to AWS EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, ctype, fileinfo, openssl, pdo, bcmath, json, tokenizer, xml
+
+      - name: Install Dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.SSH_USERNAME }}@${{ secrets.HOST }} << 'EOSSH'
+            set -e
+
+            echo "Changing to project directory..."
+            cd /home/ubuntu/laravelnew-cicd
+
+            echo "Setting file ownership and permissions..."
+            sudo chown -R ubuntu:www-data storage bootstrap/cache
+            chmod -R 770 storage bootstrap/cache
+
+            echo "Fetching latest code from Git..."
+            sudo chown -R ubuntu:ubuntu .git
+            git fetch --all
+            git reset --hard origin/main
+
+            echo "Installing dependencies..."
+            COMPOSER_MEMORY_LIMIT=-1 composer install --no-interaction --prefer-dist --optimize-autoloader
+
+            echo "Running Laravel setup commands..."
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            echo "Restarting services..."
+            sudo systemctl restart php8.1-fpm
+            sudo systemctl restart nginx
+
+            echo "Deployment completed successfully."
+          EOSSH
